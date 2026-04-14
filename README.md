@@ -4,7 +4,7 @@ Building immersive web experiences with Three.js, creative code, and pixel-perfe
 
 
 🚀 About Me
-I'm a creative developer and designer passionate about pushing the boundaries of web technology. I specialize in combining advanced 3D graphics, interactive experiences, and clean code to create digital experiences that are both beautiful and functional.
+I'm a creative digital and product designer passionate about pushing the boundaries of web technology. I specialize in combining advanced 3D graphics, interactive experiences, and clean code to create digital experiences that are both beautiful and functional.
 My work spans interactive portfolios, 3D visualizations, and creative web applications that blur the line between design and development.
 
 🔬 Technical Expertise
