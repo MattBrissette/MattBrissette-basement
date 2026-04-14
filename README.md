@@ -1,52 +1,78 @@
-1. Full 3D Studio Environment
-This isn’t just rendering a flat page on geometry — it’s a complete photorealistic 3D basement studio, featuring:
+Matt Brissette | Senior Digital & Product Designer
 
-Realistic lighting (spotlights, ambient light, wall lighting)
-High-quality shadow mapping (2048×2048 shadow maps)
-Physically-based materials (roughness, metalness across all objects)
+Building immersive web experiences with Three.js, creative code, and pixel-perfect design.
 
-2. Detailed 3D Assets (Procedurally Built)
-Every object is hand-coded geometry:
 
-Desk: Four legs, material mat, contact shadows
-Monitor: Curved bezel (dynamic geometry), screen stand, chin piece
-Speakers: Full woofer + tweeter construction
-Keyboard & Mouse: Includes contact shadows
-Dust motes: Animated particles floating in 3D space using sine/cosine motion
-Lighting rig: Multiple light sources casting realistic shadows
+🚀 About Me
+I'm a creative developer and designer passionate about pushing the boundaries of web technology. I specialize in combining advanced 3D graphics, interactive experiences, and clean code to create digital experiences that are both beautiful and functional.
+My work spans interactive portfolios, 3D visualizations, and creative web applications that blur the line between design and development.
 
-3. Canvas-to-Texture Pipeline
-An HTML canvas is rendered directly onto the 3D monitor in real time.
+🔬 Technical Expertise
 
-The monitor displays live UI content as a projected texture
-Creates a seamless bridge between DOM and 3D environment
+3D Graphics: Three.js, WebGL, GLSL shaders
+Creative Coding: Procedural animation, physics simulation, interactive geometry
+Frontend: React, Tailwind CSS, HTML5 Canvas
+Animation: GSAP, Framer Motion, shader-based effects
+Design Tools: Figma, Blender, Adobe Creative Suite
+Performance: GPU optimization, shadow mapping, render optimization
 
-4. Smart Camera Behavior
-The camera operates in two distinct states:
 
-Normal: Cinematic view (12, 8, 18) with a wide pan range
-Zoomed: Close-up on monitor (0, eye level, 7.8) with subtle parallax
+📂 Projects
+Basement Studio (Live)
+A fully immersive 3D studio environment. Click to zoom into a detailed workspace with procedurally generated assets, realistic lighting, and an interactive monitor displaying content.
+Tech: Three.js, Canvas API, WebGL, Procedural Geometry
 
-Additional behavior:
+20+ 3D objects with realistic materials and shadows
+Dynamic camera system with contextual focus
+Real-time HTML-to-texture rendering
+Dust particle system with sine-wave animation
 
-Uses lerp() for smooth, fluid transitions
-Mouse position dynamically controls pan and look-at point based on zoom level
+Portfolio Hub (Live)
+An interactive portfolio with page-aware 3D transitions. Navigate between work, about, and contact sections through custom shaders and fluid geometry manipulation.
+Tech: Three.js, GLSL Shaders, html2canvas, GSAP
 
-5. Gesture-Based Navigation
-Click anywhere (except contact button) → zoom to monitor
+Custom vertex/fragment shaders with chromatic aberration
+Real-time page-to-texture conversion
+Elastic transition animations
+Mouse velocity tracking with dynamic effects
 
-Scroll up/down → toggle zoom state
-Contextual overlay updates:
-“SCROLL TO FOCUS”
-“SCROLL TO EXIT”
+Interactive Web Experiences
+Building one-off creative experiences, data visualizations, and experimental interfaces.
 
-6. Atmospheric Effects
-Film grain overlay (mix-blend-mode: overlay)
-Bloom layer with radial gradient (cyan/teal glow)
-Animated dust particles with sine-wave motion
-Custom cursor with hover-based scale animation
+💻 Featured Technologies
+Three.js Mastery
 
-7. Contact Shadow Simulation
-Custom createContactShadow() function
-Generates soft, realistic shadows beneath objects
-Fully dynamic (not baked), with accurate positioning
+Complex scene setup with multiple light sources
+Shadow mapping and contact shadows
+Material physics (roughness, metalness, transparency)
+GPU-optimized geometry and texture management
+Custom shader implementation for advanced effects
+
+Animation & Interaction
+
+Smooth camera movement with lerp interpolation
+Physics-based easing functions
+Gesture detection (scroll, click, mouse movement)
+Responsive state management
+Contextual UI updates based on interaction
+
+Performance Optimization
+
+Pixel ratio capping for mobile devices
+Efficient particle system updates
+Canvas texture re-rendering only when needed
+Shadow map size optimization (2048x2048)
+GPU memory management and disposal
+
+
+🎨 Design Philosophy
+I believe in creating experiences that are:
+
+Immersive: Draw users into the environment
+Intuitive: Interactions feel natural and responsive
+Performant: Runs smoothly across devices
+Purposeful: Every effect serves the narrative
+
+
+installations
+Consultation: Technical architecture for ambitious web projects
