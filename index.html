@@ -84,49 +84,36 @@
             transition: opacity 1s ease;
         }
 
-        .toast-notification {
+        /* Toast Notification Styles */
+        #toast-notification {
             position: fixed;
             top: 2rem;
-            right: 2rem;
-            background: rgba(10, 10, 10, 0.9);
-            backdrop-filter: blur(24px) saturate(180%);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             color: white;
-            padding: 1rem 1.25rem;
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 0.4rem;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.6);
-            transform: translateX(100%) scale(0.9);
+            padding: 0.75rem 1.5rem;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            border-radius: 4px;
             opacity: 0;
-            transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 200;
             pointer-events: none;
-            min-width: 280px;
         }
-
-        .toast-notification.active {
-            transform: translateX(0) scale(1);
+        #toast-notification.show {
             opacity: 1;
-        }
-
-        .toast-icon {
-            width: 18px;
-            height: 18px;
-            border: 1px solid rgba(255,255,255,0.4);
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 9px;
-            color: rgba(255,255,255,0.8);
+            transform: translateX(-50%) translateY(0);
         }
     </style>
 </head>
 <body>
 
     <div id="custom-cursor"></div>
+    <div id="toast-notification">Email address has been copied to the clipboard</div>
 
     <div id="loading" class="loading-screen">
         <div class="text-center">
@@ -135,14 +122,6 @@
                 <div id="loader-bar" class="h-full bg-white w-0 transition-all duration-700"></div>
             </div>
         </div>
-    </div>
-
-    <div id="toast" class="toast-notification">
-        <div class="flex items-center gap-2">
-            <div class="toast-icon">M</div>
-            <span class="text-[9px] tracking-[0.25em] uppercase opacity-40 font-semibold">System Notification</span>
-        </div>
-        <div class="text-[13px] font-light tracking-wide text-white/90" id="toast-message"></div>
     </div>
 
     <div class="film-grain"></div>
@@ -167,8 +146,10 @@
 
     <script>
         let scene, camera, renderer, uiCanvas, uiContext, canvasTexture, wallLight, dustParticles;
-        let deskGroup, monitorGroup, backWall, wallAO;
+        let deskGroup, monitorGroup, backWall, wallAO, steamParticles;
+        let speakerBody, speakerWoofer;
         let isZoomed = false;
+        let isBassBoosted = false;
         const currentLookAt = new THREE.Vector3(0, 1.8, 0);
 
         let mouseX = 0, mouseY = 0;
@@ -178,22 +159,63 @@
         const MONITOR_EYE_LEVEL = DESK_HEIGHT + 2.2; 
 
         let zoomProgress = 0;
+        
+        // Navigation State
+        let currentView = 'home'; 
+        const interactiveRegions = [];
+
+        // Profile Image
+        const profileImg = new Image();
+        profileImg.crossOrigin = "anonymous";
+        profileImg.src = "https://imglink.cc/cdn/CmB85TAM3M.jpg";
+        let profileImgLoaded = false;
+        profileImg.onload = () => { profileImgLoaded = true; };
 
         const cursor = document.getElementById('custom-cursor');
         window.addEventListener('mousemove', (e) => {
             cursor.style.left = e.clientX + 'px';
             cursor.style.top = e.clientY + 'px';
             const target = e.target;
-            const isClickable = target.id === 'contact-trigger' || (isZoomed && target.tagName === 'CANVAS');
+            
+            let canvasHover = false;
+            let speakerHover = false;
+
+            if (isZoomed && target.tagName === 'CANVAS') {
+                const raycaster = new THREE.Raycaster();
+                const mouse = new THREE.Vector2(
+                    (e.clientX / window.innerWidth) * 2 - 1,
+                    -(e.clientY / window.innerHeight) * 2 + 1
+                );
+                raycaster.setFromCamera(mouse, camera);
+                
+                // Monitor Check
+                const screenObj = monitorGroup.children.find(c => c.geometry.type === 'PlaneGeometry');
+                const screenIntersects = raycaster.intersectObject(screenObj);
+                if (screenIntersects.length > 0) {
+                    const uv = screenIntersects[0].uv;
+                    const cx = uv.x * uiCanvas.width;
+                    const cy = (1 - uv.y) * uiCanvas.height;
+                    canvasHover = interactiveRegions.some(r => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h);
+                }
+
+                // Speaker Check
+                if (speakerBody) {
+                    const speakerIntersects = raycaster.intersectObject(speakerBody);
+                    if (speakerIntersects.length > 0) speakerHover = true;
+                }
+            }
+
+            const isClickable = target.id === 'contact-trigger' || canvasHover || speakerHover;
             if (isClickable) document.body.classList.add('cursor-hover');
             else document.body.classList.remove('cursor-hover');
         });
 
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toast-message').innerText = message;
-            toast.classList.add('active');
-            setTimeout(() => toast.classList.remove('active'), 4000);
+        function showToast() {
+            const toast = document.getElementById('toast-notification');
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
         }
 
         function copyEmailToClipboard() {
@@ -206,7 +228,7 @@
             el.select();
             document.execCommand('copy');
             document.body.removeChild(el);
-            showToast(`${email} has been copied to the clipboard`);
+            showToast();
         }
 
         document.getElementById('contact-trigger').addEventListener('click', (e) => {
@@ -223,7 +245,8 @@
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, w, h);
             
-            // Grid Background
+            interactiveRegions.length = 0;
+
             ctx.strokeStyle = 'rgba(255,255,255,0.03)';
             ctx.lineWidth = 1;
             for(let i=0; i<w; i+=100) {
@@ -231,17 +254,187 @@
                 ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(w, i); ctx.stroke();
             }
 
-            // Text Content Header - Senior Updated
+            if (currentView === 'home') {
+                drawHome(ctx, w, h, time);
+            } else {
+                drawSubView(ctx, w, h, time);
+            }
+
+            drawHUD(ctx, w, h, time);
+        }
+
+        function drawHome(ctx, w, h, time) {
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
             ctx.font = '400 52px Inter'; 
             ctx.fillText('Matt Brissette', 145, 180); 
             
             ctx.fillStyle = 'white';
             ctx.font = '600 130px Inter'; 
-            ctx.fillText('Senior Digital &', 140, 310); // Line 1
-            ctx.fillText('Product Designer', 140, 440); // Line 2
+            ctx.fillText('Senior Digital &', 140, 326); 
+            ctx.fillText('Product Designer', 140, 456); 
 
-            // Clock in Top Right
+            const padding = 140;
+            const gap = 30;
+            const boxWidth = (w - (padding * 2) - (gap * 2)) / 3;
+            const boxHeight = 600;
+            const startY = 616;
+
+            const sections = [
+                { id: 'about', title: 'About', desc: 'Who I am, how I think, and the approach behind my work.' },
+                { id: 'portfolio', title: 'Portfolio', desc: 'Selected work across product, brand, and digital experiences.' },
+                { id: 'contact', title: 'Contact', desc: 'Reach out for collaborations, opportunities, or a quick conversation.' }
+            ];
+
+            sections.forEach((s, i) => {
+                const x = padding + (boxWidth + gap) * i;
+                drawSection(s.title, s.desc, x, startY, boxWidth, boxHeight, s.id);
+            });
+        }
+
+        function drawSubView(ctx, w, h, time) {
+            const padding = 140;
+            
+            ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+            ctx.strokeRect(padding, 140, 200, 80);
+            ctx.fillStyle = 'white';
+            ctx.font = '600 32px Inter';
+            ctx.fillText('< BACK', padding + 45, 192);
+            interactiveRegions.push({ x: padding, y: 140, w: 200, h: 80, id: 'home' });
+
+            ctx.fillStyle = 'white';
+            ctx.font = '600 120px Inter';
+            ctx.fillText(currentView.toUpperCase(), padding, 400);
+
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            
+            let content = "";
+            let fontSize = 48;
+            let lineSpacing = 70;
+            let textX = padding;
+            let textWidth = w - (padding * 2);
+
+            if (currentView === 'about') {
+                fontSize = 36;
+                lineSpacing = 54;
+                
+                if (profileImgLoaded) {
+                    const imgW = 480;
+                    const imgH = 600;
+                    const imgX = w - padding - imgW;
+                    const imgY = 480;
+                    
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                    ctx.strokeRect(imgX - 10, imgY - 10, imgW + 20, imgH + 20);
+                    ctx.drawImage(profileImg, imgX, imgY, imgW, imgH);
+                    ctx.restore();
+                    
+                    textWidth = imgX - padding - 80;
+                }
+                
+                content = "I’m a Digital & Product-focused designer blending strategy, storytelling, and execution to create experiences that actually move the needle.\n\nWith over a decade of experience across product design, branding, and digital applications, I’ve worked at the intersection of business goals and user needs—helping teams turn complex ideas into clear, usable, and engaging products.\n\nMy background spans B2C and B2B environments, where I’ve led and contributed to everything from early-stage concepts to fully realized design systems. Whether it’s shaping a product from scratch or refining an existing experience, I focus on clarity, consistency, and impact.\n\nToday, my workflow is deeply augmented by AI. I actively integrate tools like Claude, Cursor, Figma Make, and Gemini to accelerate ideation, prototyping, and production—allowing me to move faster, explore more directions, and deliver smarter solutions.";
+            } else if (currentView === 'portfolio') {
+                content = "Project index loading... Feature currently under construction for the next roadmap milestone. Check back shortly.";
+            } else if (currentView === 'contact') {
+                content = "Got something in mind?\n\nI’m always interested in new projects, collaborations, or just a good conversation about design and technology.\n\nLocation\nOttawa, Canada\n\nEmail";
+                fontSize = 42; 
+                lineSpacing = 64;
+            }
+
+            ctx.font = `400 ${fontSize}px Inter`;
+            let posY = 520;
+            
+            const paragraphs = content.split('\n');
+            paragraphs.forEach(para => {
+                if (para === "") {
+                    posY += lineSpacing * 0.5;
+                    return;
+                }
+                const words = para.split(' ');
+                let line = '';
+                for(let n = 0; n < words.length; n++) {
+                    let testLine = line + words[n] + ' ';
+                    let metrics = ctx.measureText(testLine);
+                    if (metrics.width > textWidth && n > 0) {
+                        ctx.fillText(line, textX, posY);
+                        line = words[n] + ' ';
+                        posY += lineSpacing;
+                    } else {
+                        line = testLine;
+                    }
+                }
+                ctx.fillText(line, textX, posY);
+                posY += lineSpacing;
+            });
+
+            // Specific UI for Contact Button
+            if (currentView === 'contact') {
+                const email = "matthieubrissette@gmail.com";
+                ctx.font = `600 ${fontSize}px Inter`;
+                const textMetrics = ctx.measureText(email);
+                const btnPaddingX = 40;
+                const btnPaddingY = 30;
+                const btnWidth = textMetrics.width + (btnPaddingX * 2);
+                const btnHeight = fontSize + (btnPaddingY * 2);
+                const btnX = textX;
+                const btnY = posY - 20;
+
+                // Button Backdrop
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+                ctx.fillRect(btnX, btnY, btnWidth, btnHeight);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(btnX, btnY, btnWidth, btnHeight);
+
+                // Button Text
+                ctx.fillStyle = 'white';
+                ctx.fillText(email, btnX + btnPaddingX, btnY + btnPaddingY + fontSize - 8);
+
+                interactiveRegions.push({
+                    x: btnX,
+                    y: btnY,
+                    w: btnWidth,
+                    h: btnHeight,
+                    id: 'copy-email'
+                });
+            }
+        }
+
+        function drawSection(t, d, x, y, width, height, id) {
+            const ctx = uiContext;
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, width, height);
+            
+            interactiveRegions.push({ x, y, w: width, h: height, id });
+
+            ctx.fillStyle = 'white';
+            ctx.font = '600 52px Inter';
+            ctx.fillText(t, x + 40, y + 90);
+            
+            ctx.fillStyle = 'rgba(255,255,255,0.45)';
+            ctx.font = '400 36px Inter'; 
+            
+            const words = d.split(' ');
+            let line = '';
+            let posY = y + 170;
+            const maxWidth = width - 80;
+
+            for(let n = 0; n < words.length; n++) {
+                let testLine = line + words[n] + ' ';
+                let metrics = ctx.measureText(testLine);
+                if (metrics.width > maxWidth && n > 0) {
+                    ctx.fillText(line, x + 40, posY);
+                    line = words[n] + ' ';
+                    posY += 54;
+                } else {
+                    line = testLine;
+                }
+            }
+            ctx.fillText(line, x + 40, posY);
+        }
+
+        function drawHUD(ctx, w, h, time) {
             const now = new Date();
             const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
             ctx.font = '400 36px Inter';
@@ -250,111 +443,65 @@
             ctx.fillText(timeString, w - 140, 140);
             ctx.textAlign = 'left';
 
-            const drawSection = (t, d, x, y, width, height) => {
-                ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(x, y, width, height);
-                
-                ctx.fillStyle = 'white';
-                ctx.font = '600 52px Inter';
-                ctx.fillText(t, x + 40, y + 90);
-                
-                ctx.fillStyle = 'rgba(255,255,255,0.45)';
-                ctx.font = '400 36px Inter'; 
-                
-                const words = d.split(' ');
-                let line = '';
-                let posY = y + 170;
-                const maxWidth = width - 80;
-
-                for(let n = 0; n < words.length; n++) {
-                    let testLine = line + words[n] + ' ';
-                    let metrics = ctx.measureText(testLine);
-                    if (metrics.width > maxWidth && n > 0) {
-                        ctx.fillText(line, x + 40, posY);
-                        line = words[n] + ' ';
-                        posY += 54;
-                    } else {
-                        line = testLine;
-                    }
-                }
-                ctx.fillText(line, x + 40, posY);
-            };
-
             const padding = 140;
-            const gap = 30;
-            const boxWidth = (w - (padding * 2) - (gap * 2)) / 3;
-            const boxHeight = 600;
-            const startY = 600; // Shifted slightly down to accommodate 2 lines of title
-
-            drawSection('About', 'Who I am, how I think, and the approach behind my work.', padding, startY, boxWidth, boxHeight);
-            drawSection('Portfolio', 'Selected work across product, brand, and digital experiences.', padding + boxWidth + gap, startY, boxWidth, boxHeight);
-            drawSection('Contact', 'Reach out for collaborations, opportunities, or a quick conversation.', padding + (boxWidth + gap) * 2, startY, boxWidth, boxHeight);
-
-            // Waveform Visualizer
             const vizWidth = 300;
             const vizHeight = 40;
             const vizX = padding;
             const vizY = h - padding - 20;
             
+            const glitchOffset = (isBassBoosted && Math.random() > 0.8) ? (Math.random() - 0.5) * 40 : 0;
+            
             ctx.beginPath();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.strokeStyle = isBassBoosted ? 'rgba(255, 50, 50, 0.6)' : 'rgba(255, 255, 255, 0.4)';
             ctx.lineWidth = 2;
-            ctx.moveTo(vizX, vizY + vizHeight / 2);
+            ctx.moveTo(vizX + glitchOffset, vizY + vizHeight / 2);
             for(let i = 0; i < vizWidth; i++) {
                 const freq = 0.05;
-                const amp = 15 * (isZoomed ? 1 : 0.4);
-                const noise = Math.sin(i * freq + time * 10) * Math.cos(i * 0.02 - time * 5);
-                ctx.lineTo(vizX + i, vizY + vizHeight / 2 + noise * amp);
+                const amp = (isBassBoosted ? 45 : 15) * (isZoomed ? 1 : 0.4);
+                const noise = Math.sin(i * freq + time * (isBassBoosted ? 20 : 10)) * Math.cos(i * 0.02 - time * 5);
+                ctx.lineTo(vizX + i + glitchOffset, vizY + vizHeight / 2 + noise * amp);
             }
             ctx.stroke();
 
             ctx.font = '300 24px Inter';
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.fillText('AUDIO_AMBIENT_HUM.WAV', vizX, vizY - 15);
+            ctx.fillStyle = isBassBoosted ? 'rgba(255, 50, 50, 0.5)' : 'rgba(255, 255, 255, 0.3)';
+            ctx.fillText(isBassBoosted ? 'MODE: BASS_STORM.WAV' : 'AUDIO_AMBIENT_HUM.WAV', vizX, vizY - 15);
 
-            // --- SYSTEM STATS BAR ---
             const statsX = w - padding;
             const statsY = h - padding;
             ctx.textAlign = 'right';
             ctx.font = '400 22px Inter';
-            
             const ram = (12.4 + Math.sin(time * 2) * 0.1).toFixed(1);
-            const gpu = (54 + Math.cos(time * 3) * 2).toFixed(0);
+            const gpu = (54 + Math.cos(time * 3) * (isBassBoosted ? 12 : 2)).toFixed(0);
             const lat = (12 + (Math.random() > 0.95 ? Math.random() * 20 : 0)).toFixed(0);
-            
-            const statsFlicker = Math.random() > 0.99 ? 0.3 : 0.6;
+            const statsFlicker = (isBassBoosted && Math.random() > 0.9) ? 0.1 : (Math.random() > 0.99 ? 0.3 : 0.6);
             ctx.fillStyle = `rgba(255, 255, 255, ${statsFlicker})`;
-            
             const statsText = `RAM: ${ram}GB  //  GPU: ${gpu}°C  //  LATENCY: ${lat}ms`;
-            ctx.fillText(statsText, statsX, statsY);
+            ctx.fillText(statsText, statsX + glitchOffset * 0.5, statsY);
             
             const barW = 80;
             const barH = 4;
             ctx.fillStyle = 'rgba(255,255,255,0.1)';
             ctx.fillRect(statsX - barW, statsY + 15, barW, barH);
-            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.fillStyle = isBassBoosted ? 'rgba(255, 50, 50, 0.5)' : 'rgba(255,255,255,0.5)';
             ctx.fillRect(statsX - barW, statsY + 15, barW * (parseFloat(ram)/32), barH);
-            
             ctx.textAlign = 'left';
 
             ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
             for(let i = 0; i < h; i += 6) {
                 ctx.fillRect(0, i, w, 2);
             }
+            
+            if (isBassBoosted && Math.random() > 0.97) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+                ctx.fillRect(0, Math.random() * h, w, Math.random() * 100);
+            }
 
             const scanPos = (time * 400) % (h + 400);
             const grad = ctx.createLinearGradient(0, scanPos - 200, 0, scanPos);
-            grad.addColorStop(0, 'transparent');
-            grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.03)');
-            grad.addColorStop(1, 'transparent');
+            grad.addColorStop(0, 'transparent'); grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.03)'); grad.addColorStop(1, 'transparent');
             ctx.fillStyle = grad;
             ctx.fillRect(0, scanPos - 200, w, 200);
-
-            if (Math.random() > 0.98) {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.02)';
-                ctx.fillRect(0, 0, w, h);
-            }
         }
 
         function createContactShadow(width, height, opacity = 0.7) {
@@ -382,6 +529,32 @@
             }
             geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
             return new THREE.Points(geometry, new THREE.PointsMaterial({ color: 0xffffff, size: 0.03, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending }));
+        }
+
+        function createCoffeeMug() {
+            const group = new THREE.Group();
+            const ceramicMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.15 });
+            const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.22, 0.55, 32), ceramicMat);
+            mug.castShadow = true;
+            group.add(mug);
+            const handle = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.04, 16, 32, Math.PI), ceramicMat);
+            handle.position.set(0.24, 0, 0); handle.rotation.z = -Math.PI/2;
+            group.add(handle);
+
+            const count = 15;
+            const steamGeo = new THREE.BufferGeometry();
+            const steamPos = new Float32Array(count * 3);
+            for(let i=0; i<count; i++) {
+                steamPos[i*3] = (Math.random()-0.5)*0.1;
+                steamPos[i*3+1] = Math.random()*0.5;
+                steamPos[i*3+2] = (Math.random()-0.5)*0.1;
+            }
+            steamGeo.setAttribute('position', new THREE.BufferAttribute(steamPos, 3));
+            steamParticles = new THREE.Points(steamGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.12, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending }));
+            steamParticles.position.y = 0.4;
+            group.add(steamParticles);
+
+            return group;
         }
 
         function init3D() {
@@ -442,42 +615,41 @@
 
             const kbPos = new THREE.Vector3(-0.5, DESK_HEIGHT + 0.14, 0.5);
             const kbShadow = createContactShadow(3.8, 1.8, 0.9); kbShadow.position.set(kbPos.x, DESK_HEIGHT + 0.112, kbPos.z); deskGroup.add(kbShadow);
-            const kbOutline = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.06, 1.2), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.4 }));
-            kbOutline.position.copy(kbPos); kbOutline.castShadow = true; deskGroup.add(kbOutline);
+            const kbBody = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.08, 1.2), new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.3 }));
+            kbBody.position.copy(kbPos); kbBody.castShadow = true; deskGroup.add(kbBody);
+            const kbKeyArea = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 1.0), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+            kbKeyArea.rotation.x = -Math.PI/2; kbKeyArea.position.set(kbPos.x, kbPos.y+0.041, kbPos.z); deskGroup.add(kbKeyArea);
 
             const mPos = new THREE.Vector3(2.2, DESK_HEIGHT + 0.14, 0.5);
             const mShadow = createContactShadow(0.8, 1.0, 0.8); mShadow.position.set(mPos.x, DESK_HEIGHT + 0.112, mPos.z); deskGroup.add(mShadow);
-            const mouseOutline = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.06, 0.7), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.4 }));
-            mouseOutline.position.copy(mPos); mouseOutline.castShadow = true; deskGroup.add(mouseOutline);
+            const mouseBody = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.08, 16), new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4 }));
+            mouseBody.position.copy(mPos); mouseBody.castShadow = true; deskGroup.add(mouseBody);
 
             const speakerPos = new THREE.Vector3(4.8, DESK_HEIGHT + 0.9, -0.4);
-            const speakerShadow = createContactShadow(1.6, 1.6, 0.8);
-            speakerShadow.position.set(speakerPos.x, DESK_HEIGHT + 0.09, speakerPos.z);
-            deskGroup.add(speakerShadow);
-
-            const speakerBody = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.8, 1.1), new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 0.5 }));
-            speakerBody.position.copy(speakerPos);
-            speakerBody.rotation.y = -Math.PI / 10; 
-            speakerBody.castShadow = true;
-            deskGroup.add(speakerBody);
-
-            const woofer = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.05, 32), new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3 }));
-            woofer.rotation.x = Math.PI / 2; woofer.position.set(0, -0.25, 0.56);
-            speakerBody.add(woofer);
-
+            const speakerShadow = createContactShadow(1.6, 1.6, 0.8); speakerShadow.position.set(speakerPos.x, DESK_HEIGHT + 0.09, speakerPos.z); deskGroup.add(speakerShadow);
+            speakerBody = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.8, 1.1), new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 0.5 }));
+            speakerBody.position.copy(speakerPos); speakerBody.rotation.y = -Math.PI / 10; speakerBody.castShadow = true; deskGroup.add(speakerBody);
+            speakerWoofer = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.05, 32), new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3 }));
+            speakerWoofer.rotation.x = Math.PI / 2; speakerWoofer.position.set(0, -0.25, 0.56); speakerBody.add(speakerWoofer);
             const tweeter = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.05, 32), new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.1 }));
-            tweeter.rotation.x = Math.PI / 2; tweeter.position.set(0, 0.4, 0.56);
-            speakerBody.add(tweeter);
+            tweeter.rotation.x = Math.PI / 2; tweeter.position.set(0, 0.4, 0.56); speakerBody.add(tweeter);
+
+            const mug = createCoffeeMug();
+            mug.position.set(-3.2, DESK_HEIGHT + 0.35, 0.8);
+            mug.rotation.y = Math.PI / 4;
+            deskGroup.add(mug);
+
+            const sketchbook = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 2.0), new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 }));
+            sketchbook.position.set(-4.5, DESK_HEIGHT + 0.05, -0.5); sketchbook.rotation.y = Math.PI/12;
+            sketchbook.castShadow = true; deskGroup.add(sketchbook);
 
             scene.add(deskGroup);
 
             monitorGroup = new THREE.Group();
-            
             const bezelGeom = new THREE.BoxGeometry(6.6, 4.4, 0.15, 32, 1, 1);
             const bezelPositions = bezelGeom.attributes.position.array;
             for (let i = 0; i < bezelPositions.length; i += 3) {
-                const x = bezelPositions[i];
-                bezelPositions[i + 2] -= (Math.pow(x, 2) * 0.015);
+                const x = bezelPositions[i]; bezelPositions[i + 2] -= (Math.pow(x, 2) * 0.015);
             }
             const bezel = new THREE.Mesh(bezelGeom, new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 0.3 }));
             bezel.position.y = MONITOR_EYE_LEVEL; bezel.position.z = -0.1; bezel.castShadow = true; monitorGroup.add(bezel);
@@ -491,8 +663,7 @@
             const screenGeom = new THREE.PlaneGeometry(6.3, 3.75, 32, 32);
             const screenPositions = screenGeom.attributes.position.array;
             for (let i = 0; i < screenPositions.length; i += 3) {
-                const x = screenPositions[i];
-                screenPositions[i + 2] -= (Math.pow(x, 2) * 0.015);
+                const x = screenPositions[i]; screenPositions[i + 2] -= (Math.pow(x, 2) * 0.015);
             }
             const screen = new THREE.Mesh(screenGeom, new THREE.MeshBasicMaterial({ map: canvasTexture, transparent: true }));
             screen.position.set(0, MONITOR_EYE_LEVEL + 0.18, 0.02); monitorGroup.add(screen);
@@ -506,13 +677,49 @@
             scene.add(dustParticles);
 
             window.addEventListener('mousemove', (e) => { targetMouseX = (e.clientX / window.innerWidth - 0.5) * 2; targetMouseY = (e.clientY / window.innerHeight - 0.5) * 2; });
+            
             window.addEventListener('mousedown', (e) => {
                 if (e.target.id === 'contact-trigger') return;
+                
                 if (!isZoomed) { 
                     isZoomed = true; 
                     document.body.classList.add('is-zoomed'); 
+                } else {
+                    const raycaster = new THREE.Raycaster();
+                    const mouse = new THREE.Vector2(
+                        (e.clientX / window.innerWidth) * 2 - 1,
+                        -(e.clientY / window.innerHeight) * 2 + 1
+                    );
+                    raycaster.setFromCamera(mouse, camera);
+                    
+                    const screenObj = monitorGroup.children.find(c => c.geometry.type === 'PlaneGeometry');
+                    const intersects = raycaster.intersectObject(screenObj);
+                    if (intersects.length > 0) {
+                        const uv = intersects[0].uv;
+                        const cx = uv.x * uiCanvas.width;
+                        const cy = (1 - uv.y) * uiCanvas.height;
+                        const clickedRegion = interactiveRegions.find(r => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h);
+                        if (clickedRegion) {
+                            if (clickedRegion.id === 'copy-email') {
+                                copyEmailToClipboard();
+                            } else {
+                                currentView = clickedRegion.id;
+                            }
+                            return;
+                        }
+                    }
+
+                    if (speakerBody) {
+                        const speakerIntersects = raycaster.intersectObject(speakerBody);
+                        if (speakerIntersects.length > 0) {
+                            isBassBoosted = !isBassBoosted;
+                            wallLight.color.setHex(isBassBoosted ? 0xff4444 : 0x00aaff);
+                            wallLight.intensity = isBassBoosted ? 25 : 15;
+                        }
+                    }
                 }
             });
+
             window.addEventListener('wheel', (e) => {
                 if (e.deltaY > 20 && !isZoomed) { isZoomed = true; document.body.classList.add('is-zoomed'); }
                 else if (e.deltaY < -20 && isZoomed) { isZoomed = false; document.body.classList.remove('is-zoomed'); }
@@ -528,34 +735,78 @@
 
         function animate() {
             requestAnimationFrame(animate);
+            const time = Date.now() * 0.001;
+            
             updateUICanvas();
             canvasTexture.needsUpdate = true;
+            
             const targetZoom = isZoomed ? 1 : 0;
             zoomProgress = THREE.MathUtils.lerp(zoomProgress, targetZoom, 0.06);
             mouseX = THREE.MathUtils.lerp(mouseX, targetMouseX, 0.05);
             mouseY = THREE.MathUtils.lerp(mouseY, targetMouseY, 0.05);
+            
+            let shakeX = 0;
+            let shakeY = 0;
+            if (isBassBoosted) {
+                const shakeAmount = isZoomed ? 0.02 : 0.08;
+                shakeX = Math.sin(time * 50) * shakeAmount * (Math.random() * 0.5 + 0.5);
+                shakeY = Math.cos(time * 45) * shakeAmount * (Math.random() * 0.5 + 0.5);
+            }
+
             const panIntensity = isZoomed ? 0.3 : 3.5;
-            const panX = mouseX * panIntensity; const panY = -mouseY * (panIntensity * 0.5);
+            const panX = (mouseX * panIntensity) + shakeX; 
+            const panY = (-mouseY * (panIntensity * 0.5)) + shakeY;
+            
             const basePos = isZoomed ? new THREE.Vector3(0, MONITOR_EYE_LEVEL + 0.1, 7.8) : new THREE.Vector3(12, 8, 18);
             camera.position.lerp(new THREE.Vector3(basePos.x + panX, basePos.y + panY, basePos.z), 0.06);
+            
             const baseLook = isZoomed ? new THREE.Vector3(0, MONITOR_EYE_LEVEL - 0.2, 0) : new THREE.Vector3(0, DESK_HEIGHT + 0.5, 0);
             currentLookAt.lerp(new THREE.Vector3(baseLook.x + panX * 0.2, baseLook.y + panY * 0.2, baseLook.z), 0.06);
             camera.lookAt(currentLookAt);
+            
+            if (speakerWoofer) {
+                if (isBassBoosted) {
+                    const pulse = 1 + Math.max(0, Math.sin(time * 15)) * 0.15;
+                    speakerWoofer.scale.set(pulse, pulse, 1);
+                    speakerWoofer.position.z = 0.56 + Math.max(0, Math.sin(time * 15)) * 0.05;
+                } else {
+                    speakerWoofer.scale.set(1, 1, 1);
+                    speakerWoofer.position.z = 0.56;
+                }
+            }
+
             const hint = document.getElementById('scroll-hint');
             if (hint) hint.innerText = isZoomed ? 'SCROLL TO EXIT' : 'SCROLL TO FOCUS';
+            
             if (backWall) { backWall.position.x = (1 - zoomProgress) * 2; backWall.position.y = 15 + (1 - zoomProgress) * 1.5; }
             if (deskGroup) { deskGroup.position.x = (1 - zoomProgress) * 0.8; deskGroup.position.z = (1 - zoomProgress) * 0.5; }
             if (wallAO) wallAO.position.x = (1 - zoomProgress) * 0.8;
             if (monitorGroup) monitorGroup.position.x = (1 - zoomProgress) * 0.2;
+            
             if (dustParticles) {
                 const positions = dustParticles.geometry.attributes.position.array;
-                const time = Date.now() * 0.0005;
+                const dTime = time * 0.5;
                 for (let i = 0; i < positions.length; i += 3) {
-                    positions[i + 1] += Math.sin(time + i) * 0.0025; positions[i] += Math.cos(time + i) * 0.0015;
+                    positions[i + 1] += Math.sin(dTime + i) * 0.0025; positions[i] += Math.cos(dTime + i) * 0.0015;
                     if (positions[i + 1] > 10) positions[i + 1] = 0; if (positions[i + 1] < 0) positions[i + 1] = 10;
                 }
                 dustParticles.geometry.attributes.position.needsUpdate = true;
             }
+
+            if(steamParticles) {
+                const positions = steamParticles.geometry.attributes.position.array;
+                const sTime = time;
+                for (let i = 0; i < positions.length; i += 3) {
+                    positions[i + 1] += 0.003;
+                    positions[i] += Math.sin(sTime + i) * 0.001;
+                    if(positions[i+1] > 1.2) {
+                        positions[i+1] = 0;
+                        positions[i] = (Math.random()-0.5)*0.1;
+                    }
+                }
+                steamParticles.geometry.attributes.position.needsUpdate = true;
+            }
+
             document.getElementById('bloom').style.opacity = isZoomed ? '0.3' : '1';
             renderer.render(scene, camera);
         }
