@@ -163,6 +163,7 @@
         // Navigation State
         let currentView = 'home'; 
         const interactiveRegions = [];
+        let hoveredRegionId = null;
 
         // Profile Image
         const profileImg = new Image();
@@ -179,6 +180,7 @@
             
             let canvasHover = false;
             let speakerHover = false;
+            let currentRegion = null;
 
             if (isZoomed && target.tagName === 'CANVAS') {
                 const raycaster = new THREE.Raycaster();
@@ -195,7 +197,8 @@
                     const uv = screenIntersects[0].uv;
                     const cx = uv.x * uiCanvas.width;
                     const cy = (1 - uv.y) * uiCanvas.height;
-                    canvasHover = interactiveRegions.some(r => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h);
+                    currentRegion = interactiveRegions.find(r => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h);
+                    canvasHover = !!currentRegion;
                 }
 
                 // Speaker Check
@@ -205,6 +208,7 @@
                 }
             }
 
+            hoveredRegionId = currentRegion ? currentRegion.id : null;
             const isClickable = target.id === 'contact-trigger' || canvasHover || speakerHover;
             if (isClickable) document.body.classList.add('cursor-hover');
             else document.body.classList.remove('cursor-hover');
@@ -287,14 +291,16 @@
 
             sections.forEach((s, i) => {
                 const x = padding + (boxWidth + gap) * i;
-                drawSection(s.title, s.desc, x, startY, boxWidth, boxHeight, s.id);
+                drawSection(s.title, s.desc, x, startY, boxWidth, boxHeight, s.id, time);
             });
         }
 
         function drawSubView(ctx, w, h, time) {
             const padding = 140;
             
-            ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+            const isHovered = hoveredRegionId === 'home';
+            ctx.strokeStyle = isHovered ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.4)';
+            ctx.lineWidth = 2;
             ctx.strokeRect(padding, 140, 200, 80);
             ctx.fillStyle = 'white';
             ctx.font = '600 32px Inter';
@@ -336,7 +342,7 @@
             } else if (currentView === 'portfolio') {
                 content = "Project index loading... Feature currently under construction for the next roadmap milestone. Check back shortly.";
             } else if (currentView === 'contact') {
-                content = "Got something in mind?\n\nI’m always interested in new projects, collaborations, or just a good conversation about design and technology.\n\nLocation\nOttawa, Canada\n\nEmail";
+                content = "Got something in mind?\n\nI’m always interested in new projects, collaborations, or just a good conversation about design and technology.\n\nEmail";
                 fontSize = 42; 
                 lineSpacing = 64;
             }
@@ -367,7 +373,6 @@
                 posY += lineSpacing;
             });
 
-            // Specific UI for Contact Button
             if (currentView === 'contact') {
                 const email = "matthieubrissette@gmail.com";
                 ctx.font = `600 ${fontSize}px Inter`;
@@ -379,59 +384,122 @@
                 const btnX = textX;
                 const btnY = posY - 20;
 
-                // Button Backdrop
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+                const isBtnHovered = hoveredRegionId === 'copy-email';
+                ctx.fillStyle = isBtnHovered ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.08)';
                 ctx.fillRect(btnX, btnY, btnWidth, btnHeight);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.strokeStyle = isBtnHovered ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.2)';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(btnX, btnY, btnWidth, btnHeight);
 
-                // Button Text
                 ctx.fillStyle = 'white';
                 ctx.fillText(email, btnX + btnPaddingX, btnY + btnPaddingY + fontSize - 8);
 
-                interactiveRegions.push({
-                    x: btnX,
-                    y: btnY,
-                    w: btnWidth,
-                    h: btnHeight,
-                    id: 'copy-email'
-                });
+                interactiveRegions.push({ x: btnX, y: btnY, w: btnWidth, h: btnHeight, id: 'copy-email' });
+
+                // LIVE BASEMENT STATUS COMPONENT
+                const statusY = btnY + btnHeight + 180;
+                const statusW = 550;
+                const statusH = 310; // Slightly increased height for location
+                const innerPadding = 32; 
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+                ctx.fillRect(textX, statusY, statusW, statusH);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.strokeRect(textX, statusY, statusW, statusH);
+                
+                const startX = textX + innerPadding;
+                
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.font = '600 20px Inter';
+                ctx.fillText('LIVE BASEMENT STATUS // V.04', startX, statusY + 35 + (innerPadding / 2));
+                
+                ctx.font = '400 24px Inter';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.fillText('COFFEE LEVELS:', startX, statusY + 85 + (innerPadding / 2));
+                ctx.fillStyle = '#ff4444';
+                ctx.fillText('12% (CRITICAL)', startX + 220, statusY + 85 + (innerPadding / 2));
+                
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.fillText('PLAYLIST:', startX, statusY + 135 + (innerPadding / 2));
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText('LO-FI BEATS', startX + 220, statusY + 135 + (innerPadding / 2));
+                
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.fillText('MOOD:', startX, statusY + 185 + (innerPadding / 2));
+                ctx.fillStyle = '#00ffcc';
+                ctx.fillText('DEEP FOCUS MODE', startX + 220, statusY + 185 + (innerPadding / 2));
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.fillText('LOCATION:', startX, statusY + 235 + (innerPadding / 2));
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText('OTTAWA, CANADA', startX + 220, statusY + 235 + (innerPadding / 2));
+                
+                const blink = Math.sin(time * 5) > 0;
+                ctx.fillStyle = blink ? '#00ffcc' : 'rgba(0, 255, 204, 0.2)';
+                ctx.beginPath();
+                ctx.arc(textX + statusW - innerPadding, statusY + innerPadding, 6, 0, Math.PI * 2);
+                ctx.fill();
             }
         }
 
-        function drawSection(t, d, x, y, width, height, id) {
+        function drawSection(t, d, x, y, width, height, id, time) {
             const ctx = uiContext;
-            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-            ctx.lineWidth = 2;
+            const isHovered = hoveredRegionId === id;
+            const innerPadding = 40; 
+            
+            ctx.strokeStyle = isHovered ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.15)';
+            ctx.lineWidth = isHovered ? 4 : 2;
             ctx.strokeRect(x, y, width, height);
+            
+            if (isHovered) {
+                ctx.fillStyle = 'rgba(255,255,255,0.03)';
+                ctx.fillRect(x, y, width, height);
+            }
             
             interactiveRegions.push({ x, y, w: width, h: height, id });
 
             ctx.fillStyle = 'white';
             ctx.font = '600 52px Inter';
-            ctx.fillText(t, x + 40, y + 90);
+            ctx.fillText(t, x + innerPadding, y + innerPadding + 42); 
             
             ctx.fillStyle = 'rgba(255,255,255,0.45)';
             ctx.font = '400 36px Inter'; 
             
             const words = d.split(' ');
             let line = '';
-            let posY = y + 170;
-            const maxWidth = width - 80;
+            let posY = y + innerPadding + 110;
+            const maxWidth = width - (innerPadding * 2);
 
             for(let n = 0; n < words.length; n++) {
                 let testLine = line + words[n] + ' ';
                 let metrics = ctx.measureText(testLine);
                 if (metrics.width > maxWidth && n > 0) {
-                    ctx.fillText(line, x + 40, posY);
+                    ctx.fillText(line, x + innerPadding, posY);
                     line = words[n] + ' ';
                     posY += 54;
                 } else {
                     line = testLine;
                 }
             }
-            ctx.fillText(line, x + 40, posY);
+            ctx.fillText(line, x + innerPadding, posY);
+
+            const footerY = y + height - innerPadding - 10;
+            const arrowXBase = x + innerPadding;
+            const arrowX = arrowXBase + (isHovered ? 6 : 0);
+            const arrowWidth = 40;
+            
+            ctx.beginPath();
+            ctx.moveTo(arrowX, footerY);
+            ctx.lineTo(arrowX + arrowWidth, footerY);
+            ctx.lineTo(arrowX + arrowWidth - 12, footerY - 12);
+            ctx.moveTo(arrowX + arrowWidth, footerY);
+            ctx.lineTo(arrowX + arrowWidth - 12, footerY + 12);
+            
+            ctx.strokeStyle = isHovered ? 'white' : 'rgba(255,255,255,0.6)';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
         }
 
         function drawHUD(ctx, w, h, time) {
@@ -488,9 +556,7 @@
             ctx.textAlign = 'left';
 
             ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-            for(let i = 0; i < h; i += 6) {
-                ctx.fillRect(0, i, w, 2);
-            }
+            for(let i = 0; i < h; i += 6) { ctx.fillRect(0, i, w, 2); }
             
             if (isBassBoosted && Math.random() > 0.97) {
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
@@ -535,12 +601,9 @@
             const group = new THREE.Group();
             const ceramicMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.15 });
             const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.22, 0.55, 32), ceramicMat);
-            mug.castShadow = true;
-            group.add(mug);
+            mug.castShadow = true; group.add(mug);
             const handle = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.04, 16, 32, Math.PI), ceramicMat);
-            handle.position.set(0.24, 0, 0); handle.rotation.z = -Math.PI/2;
-            group.add(handle);
-
+            handle.position.set(0.24, 0, 0); handle.rotation.z = -Math.PI/2; group.add(handle);
             const count = 15;
             const steamGeo = new THREE.BufferGeometry();
             const steamPos = new Float32Array(count * 3);
@@ -551,9 +614,7 @@
             }
             steamGeo.setAttribute('position', new THREE.BufferAttribute(steamPos, 3));
             steamParticles = new THREE.Points(steamGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.12, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending }));
-            steamParticles.position.y = 0.4;
-            group.add(steamParticles);
-
+            steamParticles.position.y = 0.4; group.add(steamParticles);
             return group;
         }
 
@@ -635,25 +696,17 @@
             tweeter.rotation.x = Math.PI / 2; tweeter.position.set(0, 0.4, 0.56); speakerBody.add(tweeter);
 
             const mug = createCoffeeMug();
-            mug.position.set(-3.2, DESK_HEIGHT + 0.35, 0.8);
-            mug.rotation.y = Math.PI / 4;
-            deskGroup.add(mug);
-
+            mug.position.set(-3.2, DESK_HEIGHT + 0.35, 0.8); mug.rotation.y = Math.PI / 4; deskGroup.add(mug);
             const sketchbook = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 2.0), new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 }));
-            sketchbook.position.set(-4.5, DESK_HEIGHT + 0.05, -0.5); sketchbook.rotation.y = Math.PI/12;
-            sketchbook.castShadow = true; deskGroup.add(sketchbook);
-
+            sketchbook.position.set(-4.5, DESK_HEIGHT + 0.05, -0.5); sketchbook.rotation.y = Math.PI/12; sketchbook.castShadow = true; deskGroup.add(sketchbook);
             scene.add(deskGroup);
 
             monitorGroup = new THREE.Group();
             const bezelGeom = new THREE.BoxGeometry(6.6, 4.4, 0.15, 32, 1, 1);
             const bezelPositions = bezelGeom.attributes.position.array;
-            for (let i = 0; i < bezelPositions.length; i += 3) {
-                const x = bezelPositions[i]; bezelPositions[i + 2] -= (Math.pow(x, 2) * 0.015);
-            }
+            for (let i = 0; i < bezelPositions.length; i += 3) { const x = bezelPositions[i]; bezelPositions[i + 2] -= (Math.pow(x, 2) * 0.015); }
             const bezel = new THREE.Mesh(bezelGeom, new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 0.3 }));
             bezel.position.y = MONITOR_EYE_LEVEL; bezel.position.z = -0.1; bezel.castShadow = true; monitorGroup.add(bezel);
-            
             const bottomChin = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.45, 0.16), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.2, metalness: 0.9 }));
             bottomChin.position.y = MONITOR_EYE_LEVEL - 2.2 + 0.225; bottomChin.position.z = -0.04; monitorGroup.add(bottomChin);
             
@@ -662,9 +715,7 @@
             
             const screenGeom = new THREE.PlaneGeometry(6.3, 3.75, 32, 32);
             const screenPositions = screenGeom.attributes.position.array;
-            for (let i = 0; i < screenPositions.length; i += 3) {
-                const x = screenPositions[i]; screenPositions[i + 2] -= (Math.pow(x, 2) * 0.015);
-            }
+            for (let i = 0; i < screenPositions.length; i += 3) { const x = screenPositions[i]; screenPositions[i + 2] -= (Math.pow(x, 2) * 0.015); }
             const screen = new THREE.Mesh(screenGeom, new THREE.MeshBasicMaterial({ map: canvasTexture, transparent: true }));
             screen.position.set(0, MONITOR_EYE_LEVEL + 0.18, 0.02); monitorGroup.add(screen);
             
@@ -673,25 +724,17 @@
             const standShadow = createContactShadow(2.5, 2.5, 0.85); standShadow.position.set(0, DESK_HEIGHT + 0.08, -0.8); scene.add(standShadow);
             scene.add(monitorGroup);
 
-            dustParticles = createDustMotes();
-            scene.add(dustParticles);
+            dustParticles = createDustMotes(); scene.add(dustParticles);
 
             window.addEventListener('mousemove', (e) => { targetMouseX = (e.clientX / window.innerWidth - 0.5) * 2; targetMouseY = (e.clientY / window.innerHeight - 0.5) * 2; });
             
             window.addEventListener('mousedown', (e) => {
                 if (e.target.id === 'contact-trigger') return;
-                
-                if (!isZoomed) { 
-                    isZoomed = true; 
-                    document.body.classList.add('is-zoomed'); 
-                } else {
+                if (!isZoomed) { isZoomed = true; document.body.classList.add('is-zoomed'); }
+                else {
                     const raycaster = new THREE.Raycaster();
-                    const mouse = new THREE.Vector2(
-                        (e.clientX / window.innerWidth) * 2 - 1,
-                        -(e.clientY / window.innerHeight) * 2 + 1
-                    );
+                    const mouse = new THREE.Vector2((e.clientX/window.innerWidth)*2-1, -(e.clientY/window.innerHeight)*2+1);
                     raycaster.setFromCamera(mouse, camera);
-                    
                     const screenObj = monitorGroup.children.find(c => c.geometry.type === 'PlaneGeometry');
                     const intersects = raycaster.intersectObject(screenObj);
                     if (intersects.length > 0) {
@@ -700,15 +743,11 @@
                         const cy = (1 - uv.y) * uiCanvas.height;
                         const clickedRegion = interactiveRegions.find(r => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h);
                         if (clickedRegion) {
-                            if (clickedRegion.id === 'copy-email') {
-                                copyEmailToClipboard();
-                            } else {
-                                currentView = clickedRegion.id;
-                            }
+                            if (clickedRegion.id === 'copy-email') copyEmailToClipboard();
+                            else currentView = clickedRegion.id;
                             return;
                         }
                     }
-
                     if (speakerBody) {
                         const speakerIntersects = raycaster.intersectObject(speakerBody);
                         if (speakerIntersects.length > 0) {
@@ -736,7 +775,6 @@
         function animate() {
             requestAnimationFrame(animate);
             const time = Date.now() * 0.001;
-            
             updateUICanvas();
             canvasTexture.needsUpdate = true;
             
@@ -745,8 +783,7 @@
             mouseX = THREE.MathUtils.lerp(mouseX, targetMouseX, 0.05);
             mouseY = THREE.MathUtils.lerp(mouseY, targetMouseY, 0.05);
             
-            let shakeX = 0;
-            let shakeY = 0;
+            let shakeX = 0, shakeY = 0;
             if (isBassBoosted) {
                 const shakeAmount = isZoomed ? 0.02 : 0.08;
                 shakeX = Math.sin(time * 50) * shakeAmount * (Math.random() * 0.5 + 0.5);
@@ -770,8 +807,7 @@
                     speakerWoofer.scale.set(pulse, pulse, 1);
                     speakerWoofer.position.z = 0.56 + Math.max(0, Math.sin(time * 15)) * 0.05;
                 } else {
-                    speakerWoofer.scale.set(1, 1, 1);
-                    speakerWoofer.position.z = 0.56;
+                    speakerWoofer.scale.set(1, 1, 1); speakerWoofer.position.z = 0.56;
                 }
             }
 
@@ -797,12 +833,8 @@
                 const positions = steamParticles.geometry.attributes.position.array;
                 const sTime = time;
                 for (let i = 0; i < positions.length; i += 3) {
-                    positions[i + 1] += 0.003;
-                    positions[i] += Math.sin(sTime + i) * 0.001;
-                    if(positions[i+1] > 1.2) {
-                        positions[i+1] = 0;
-                        positions[i] = (Math.random()-0.5)*0.1;
-                    }
+                    positions[i + 1] += 0.003; positions[i] += Math.sin(sTime + i) * 0.001;
+                    if(positions[i+1] > 1.2) { positions[i+1] = 0; positions[i] = (Math.random()-0.5)*0.1; }
                 }
                 steamParticles.geometry.attributes.position.needsUpdate = true;
             }
